@@ -1,0 +1,196 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hunter MM2 | Owner Panel</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#050807;color:#eafff0;
+ font-family:Arial,sans-serif;
+ min-height:100vh;
+}
+header{
+ padding:22px;background:#09130e;
+ border-bottom:1px solid #00ff7744;
+ display:flex;justify-content:space-between;
+ align-items:center;
+}
+.logo{color:#00ff77;font-weight:bold;font-size:20px}
+main{max-width:950px;margin:35px auto;padding:16px}
+.card{
+ background:#0b1510;border:1px solid #00ff7744;
+ border-radius:14px;padding:22px;margin-bottom:18px;
+ box-shadow:0 0 20px #00ff7710;
+}
+h2{color:#00ff77}
+button{
+ background:#00df70;color:#001b0c;
+ border:0;border-radius:8px;padding:13px 18px;
+ font-weight:bold;cursor:pointer;
+}
+button:hover{background:#7dffb0}
+input{
+ background:#07100b;color:white;border:1px solid #00ff7755;
+ padding:12px;border-radius:8px;width:100%;
+}
+.muted{color:#91aa99;font-size:13px}
+.hidden{display:none}
+.stat{font-size:27px;color:#00ff77;font-weight:bold}
+.log{
+ border-bottom:1px solid #00ff7722;
+ padding:14px 0;overflow-wrap:anywhere
+}
+</style>
+</head>
+
+<body>
+<header>
+ <div class="logo">HUNTER MM2</div>
+ <div class="muted">OWNER SYSTEM // ONLINE</div>
+</header>
+
+<main>
+ <section class="card" id="login">
+  <h2>ACCESS TERMINAL</h2>
+  <p class="muted">Inicia sesión con tu cuenta autorizada.</p>
+  <button id="loginBtn">CONTINUAR CON GOOGLE</button>
+  <p id="message" class="muted"></p>
+ </section>
+
+ <section id="dashboard" class="hidden">
+  <div class="card">
+   <h2>OWNER DASHBOARD</h2>
+   <p id="account" class="muted"></p>
+   <div class="stat" id="total">0</div>
+   <p class="muted">GLOBAL LOGS</p>
+   <button id="refreshBtn">ACTUALIZAR</button>
+   <button id="logoutBtn">CERRAR SESIÓN</button>
+  </div>
+
+  <div class="card">
+   <h2>GLOBAL LOGS</h2>
+   <div id="logs">Esperando conexión...</div>
+  </div>
+ </section>
+</main>
+
+<script type="module">
+import { initializeApp } from
+"https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+
+import {
+ getAuth, GoogleAuthProvider, signInWithPopup,
+ onAuthStateChanged, signOut
+} from
+"https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+
+import {
+ getFirestore, collection, getDocs,
+ query, orderBy
+} from
+"https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+// REEMPLAZA ESTOS VALORES CON TU CONFIGURACIÓN FIREBASE
+const firebaseConfig = {
+ apiKey: "TU_API_KEY",
+ authDomain: "huntermm2-global.firebaseapp.com",
+ projectId: "huntermm2-global",
+ storageBucket: "TU_STORAGE_BUCKET",
+ messagingSenderId: "TU_SENDER_ID",
+ appId: "TU_APP_ID"
+};
+
+// REEMPLAZA POR TU CORREO DE GOOGLE
+const OWNER_EMAIL = "TU_CORREO@gmail.com";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+const login = document.getElementById("login");
+const dashboard = document.getElementById("dashboard");
+const message = document.getElementById("message");
+
+document.getElementById("loginBtn").onclick = async () => {
+ try {
+  await signInWithPopup(auth, provider);
+ } catch(error) {
+  message.textContent = "Error de acceso: " + error.message;
+ }
+};
+
+onAuthStateChanged(auth, async user => {
+ if(user && user.email === OWNER_EMAIL) {
+  login.classList.add("hidden");
+  dashboard.classList.remove("hidden");
+  document.getElementById("account").textContent =
+   "OWNER: " + user.email;
+  await loadLogs();
+ } else {
+  dashboard.classList.add("hidden");
+  login.classList.remove("hidden");
+  if(user) {
+   await signOut(auth);
+   message.textContent = "Acceso no autorizado.";
+  }
+ }
+});
+
+async function loadLogs() {
+ const output = document.getElementById("logs");
+ output.textContent = "Cargando registros...";
+
+ try {
+  const q = query(
+   collection(db, "logs"),
+   orderBy("timestamp", "desc")
+  );
+
+  const snapshot = await getDocs(q);
+  document.getElementById("total").textContent =
+   snapshot.size;
+
+  output.innerHTML = "";
+
+  snapshot.forEach(doc => {
+   const data = doc.data();
+   const item = document.createElement("div");
+   item.className = "log";
+
+   const name = document.createElement("strong");
+   name.textContent = data.User || data.user || "Sin nombre";
+
+   const id = document.createElement("p");
+   id.textContent = "User ID: " +
+    (data.userId || "No disponible");
+
+   const date = document.createElement("p");
+   date.className = "muted";
+   date.textContent = data.timestamp?.toDate
+    ? data.timestamp.toDate().toLocaleString()
+    : "Fecha no disponible";
+
+   item.append(name, id, date);
+   output.appendChild(item);
+  });
+
+  if(snapshot.empty) output.textContent = "No hay registros.";
+
+ } catch(error) {
+  output.textContent = "No se pudieron cargar los registros. Revisa los permisos de Firestore.";
+  console.error(error);
+ }
+}
+
+document.getElementById("refreshBtn").onclick = loadLogs;
+
+document.getElementById("logoutBtn").onclick =
+ () => signOut(auth);
+</script>
+</body>
+</html>
